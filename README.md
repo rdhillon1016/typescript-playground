@@ -4,7 +4,7 @@ TypeScript adds static type checking to JavaScript. TypeScript's tooling is espe
 
 You can have JavaScript classes that implicitly implement an interface, just by having the right properties.
 
-In addition to JavaScript's primitives, you can use `any` (allow anything), `unknown` (ensure someone using this type declares what the type is), `never` (this type can never happen), and `void` (a function which returns `undefined` or has no return value).
+In addition to JavaScript's primitives, you can use `any` (allow anything), `unknown` (similar to the `any` type, but is safer because it’s not legal to do anything with an `unknown` value), `never` (this type can never happen), and `void` (a function which returns `undefined` or has no return value).
 
 You’ll see that there are two syntaxes for building types: Interfaces and Types. You should prefer interface. Use type when you need specific features.
 
@@ -79,6 +79,8 @@ interface Point {
 }
 ```
 An object doesn't have to explicitly declare that it implements an interface, as TypeScript is a **structurally typed** system. If the object has the expected properties, it is compatible with that type. Contrast this with Java, where two different classes can have the exact same members as each other, but are not considered type compatible. This is called **nominal typing**.
+
+You may notice that structural typing is similar to **duck typing**. The difference is that structural typing is a static typing system that determines type compatibility and equivalence by a type's structure, whereas duck typing is dynamic and determines type compatibility by only htat part of a type's structure that is accessed during runtime.
 
 The key difference between type aliases and interfaces in the context of object types is that you can add new properties to existing interfaces. There are a few other minor differneces.
 
@@ -157,6 +159,130 @@ Types can also be narrowed using assertion functions.
 When every type in a union contains a common property with literal types, TypeScript considers that to be a **discriminated union**, and can narrow out the members of the union based on the value of that common property.
 
 When narrowing, you can reduce the options of a union to a point where you have removed all possibilities and have nothing left. In those cases, TypeScript will use a `never` type to represent a state which shouldn’t exist.
+
+# Functions
+
+You can assign **function type expressions** to variables:
+```ts
+function greeter(fn: (a: string) => void) {
+  fn("Hello, World");
+}
+```
+
+Since functions are objects in JavaScript, it can have properties. Function type expression syntax doesn't allow for declaring properties. To declare properties on functions, we can write a **call signature** in an object type:
+```ts
+type DescribableFunction = {
+  description: string;
+  (someArg: number): boolean;
+};
+```
+
+To indicate that a function is a constructor, you can use a **construct signature**:
+```ts
+type SomeConstructor = {
+  new (s: string): SomeObject;
+};
+```
+
+Some objects, like JavaScript’s `Date` object, can be called with or without `new`. You can combine call and construct signatures in the same type arbitrarily.
+
+**Generics** are used when we want to describe a correspondence between two values. We do this by declaring a type parameter in the function signature:
+```ts
+function firstElement<Type>(arr: Type[]): Type | undefined {
+  return arr[0];
+}
+```
+
+We can use a **constraint** to limit the kinds of types that a type parameter can accept:
+```ts
+function longest<Type extends { length: number }>(a: Type, b: Type) {
+  // ...
+}
+```
+
+You can have optional parameters in functions, like
+```ts
+function f(x?: number) {
+  // ...
+}
+```
+Here the type of `x` is `number | undefined`. You can provide a parameter default as well, like `function f(x: number | string = 10) {}`.
+
+In JavaScript, if you call a function with more arguments than there are parameters, the extra arguments are simply ignored. TypeScript behaves the same way.
+
+You can overload functions by using **overload signatures**, like so:
+```ts
+function makeDate(timestamp: number): Date;
+function makeDate(m: number, d: number, y: number): Date;
+function makeDate(mOrTimestamp: number, d?: number, y?: number): Date {
+  if (d !== undefined && y !== undefined) {
+    return new Date(y, mOrTimestamp, d);
+  } else {
+    return new Date(mOrTimestamp);
+  }
+}
+const d1 = makeDate(12345678);
+const d2 = makeDate(5, 5, 5);
+```
+
+Note that the function signature for the implementation (i.e the **implementation signature**) may lead you to believe that you can call the function with two arguments, but this is actually not allowed. TypeScript will throw an error if you try to call `makeDate(5, 5)`.
+
+TypeScript can only resolve a function call to a single overload. For example:
+```ts
+function len(s: string): number;
+function len(arr: any[]): number;
+function len(x: any) {
+  return x.length;
+}
+len(Math.random() > 0.5 ? "hello" : [0]);
+```
+will fail, as the type of the argument must be either `string` or `any[]`, not both (`"hello" | number[]`) like it is in the call. For this reason, always prefer parameters with union types instead of overloads when possible.
+
+TypeScript lets you declare the type for `this` in the function body, like `let filter: (this: User) => boolean;`. Note that arrow functions don't have their own bindings for `this` (it will be the global object), so you need to use `function` for the implementation of the function signature.
+
+You can use **rest parameters** for functions that take an unbounded number of arguments.
+```ts
+function multiply(n: number, ...m: number[]) {
+  return m.map((x) => n * x);
+}
+```
+The type annotation must be an array or a tuple type.
+
+Note that in general, TypeScript does not assume that arrays are immutable (TypeScript assumes they can be of arbitrary length). To enforce immutability, you can use a `const` context:
+```ts
+// Inferred as 2-length tuple
+const args = [8, 5] as const;
+```
+
+You can use destructuring syntax with type annotations:
+```ts
+function sum({ a, b, c }: { a: number; b: number; c: number }) {
+  console.log(a + b + c);
+}
+```
+
+Contextual typing with a return type of `void` does not force functions to not return something. Another way to say this is a contextual function type with a `void` return type (`type voidFunc = () => void`), when implemented, can return any other value, but it will be ignored. All of the following implementations are valid:
+```ts
+type voidFunc = () => void;
+ 
+const f1: voidFunc = () => {
+  return true;
+};
+ 
+const f2: voidFunc = () => true;
+ 
+const f3: voidFunc = function () {
+  return true;
+};
+```
+
+There is one other special case to be aware of, when a literal function definition has a void return type, that function must not return anything:
+```ts
+function f2(): void {
+  // @ts-expect-error
+  return true;
+}
+```
 
 # Compiler
 

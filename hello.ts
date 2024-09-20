@@ -1,5 +1,1 @@
-interface Point = number | string;
-
-function printName(obj: { first: string; last?: { a, b } }) {
-    console.log(obj.last.a);
-}
+const args = [8, 5] as const;
