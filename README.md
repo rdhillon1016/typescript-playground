@@ -284,6 +284,113 @@ function f2(): void {
 }
 ```
 
+# Object Types
+
+Properties can be marked `readonly` (can't be re-assigned).
+```ts
+interface SomeType {
+  readonly prop: string;
+}
+```
+
+TypeScript doesn’t factor in whether properties on two types are readonly when checking whether those types are compatible, so *`readonly` properties can also change via aliasing*. That is, you can assign a read only variable to a writable variable and then write to it.
+
+Sometimes you don’t know all the names of a type’s properties ahead of time, but you do know the shape of the values.
+
+In those cases you can use an **index signature** to describe the types of possible values, for example:
+```ts
+interface StringArray {
+  [index: number]: string;
+}
+```
+This reads: "when a StringArray is indexed with a `number`, it will return a `string`.
+
+You can make index signatures `readonly`.
+
+Object literals get special treatment and undergo **excess property checking** when assigning them to other variables, or passing them as arguments. If an object literal has any properties that the “target type” doesn’t have, you’ll get an error. To get around this restriction, you can use a type assertion. Another way it to use a string index signature in the target type definition if you're sure that the object can have some extra properties. A third way is to assign the object to another variable first. This workaround only works if you have a common property between the object and the target type. All three ways are shown below:
+```ts
+interface SquareConfig {
+  color?: string;
+  width?: number;
+}
+ 
+function createSquare(config: SquareConfig): { color: string; area: number } {
+  return {
+    color: config.color || "red",
+    area: config.width ? config.width * config.width : 20,
+  };
+}
+
+// Throws error, as "colour" doesn't exist in target type
+let mySquare = createSquare({ colour: "red", width: 100 });
+
+// Workaround 1
+let mySquare = createSquare({ width: 100, opacity: 0.5 } as SquareConfig);
+
+// Workaround 2
+interface SquareConfig {
+  color?: string;
+  width?: number;
+  [propName: string]: any;
+}
+
+// Workaround 3
+let squareOptions = { colour: "red", width: 100 };
+let mySquare = createSquare(squareOptions);
+// However, the following will fail as there is no common property
+let squareOptions = { colour: "red" };
+let mySquare = createSquare(squareOptions);
+```
+
+Interfaces can extend other interfaces.
+
+TypeScript provides another construct called intersection types that is mainly used to combine existing object types using the `&` operator, like `type ColorfulCircle = Colorful & Circle;`. Note that the resultant includes all properties of both types -- not just properties common to both (the term "intersection" in this context refers to the intersection of the sets of valid objects for both objects, including excess properties).
+
+This gives us two ways to combine two interfaces -- by extending both of them, or by using an intersection type. The difference here is in the "extending" case, TypeScript will attempt to merge the two interfaces, unless there is a common property amongst them but with incompatible types, in which case it'll throw an error. If this same scenario exists in the intersection type case, TypeScript will not throw an error, but the common property on instances of that intersection type will be `never` possible.
+
+We can make a generic Box type which declares a type parameter:
+```ts
+interface Box<Type> {
+  contents: Type;
+}
+```
+You might read this as "A `Box` of `Type` is something whose contents have type `Type`". Type aliases can only be generic.
+
+This allows us to avoid the following boilerplate:
+```ts
+interface NumberBox {
+  contents: number;
+}
+ 
+interface StringBox {
+  contents: string;
+}
+ 
+interface BooleanBox {
+  contents: boolean;
+}
+```
+
+`ReadonlyArray<Type>` exists, and its shorthand is `readonly Type[]`. Unlike the `readonly` property modifier, assignability isn't bidirectional between regular `Array`s and `ReadonlyArray`s.
+```ts
+let x: readonly string[] = [];
+let y: string[] = [];
+ 
+x = y;
+// The following will throw an array, as the type 'readonly string[]' cannot
+// be assigned to the mutable type 'string[]'
+y = x;
+```
+
+A `tuple` type is another sort of Array type that knows exactly how many elements it contains, and exactly which types it contains at specific positions. Optional tuple elements can only come at the end, and the type of `length` thus becomes a union. 
+
+Tuples can also have rest (`...Type[]`) elements, placed wherever. Tuples types can be used in rest parameters and arguments.
+
+Array literals with const assertions will be inferred with readonly tuple types:
+```ts
+let point = [3, 4] as const;
+```
+
 # Compiler
 
 After downloading the TypeScript compiler as a dev dependency, we can run `npx tsc hello.ts` to transpile it.
