@@ -120,6 +120,44 @@ Writing `!` after any expression is effectively a type assertion that the value 
 
 **Enums** exist.
 
+# Narrowing
+
+TypeScript recognizes type guards like `typeof someVariable === "number"` and uses that to **narrow** (gaining information that a type is more specific than what is declared) the type. For example:
+```ts
+function something(someVariable: number | string) {
+  if (typeof someVariable === "number") {
+    // TypeScript knows that someVariable must be a number, and
+    // thus won't throw errors when doing numeric operations on someVariable
+  }
+}
+```
+
+**Truthiness narrowing** happens when TypeScript gains information about the type of a variable based on whether it is truthy. For example. For example, by checking if a variable is truthy, you can be sure that it is non-null, non-undefined, not equal to 0, etc...
+
+**Equality narrowing** happens when TypeScript gains info about the type of a variable based on whether it is equal or not to another variable/type/literal. This type of narrowing happens for both strict (triple equals) and loose (double equals) equality.
+
+**`in` operator narrowing** happens when you use the `in` operator to determine if an object or its prototype chain has a property with the specified name.
+
+In JavaScript `x instanceof Foo` checks whether the prototype chain of `x` contains `Foo.prototype`.  TypeScript uses this as a type guard for narrowing.
+
+Variable assignability is always checked against the **declared type**. For example, if a variable has declared type `string | number`, assigning it to a number doesn't mean the type changes to `number` only.
+
+More generally, TypeScript analyzes and narrows types based on code reachability in what is called **control flow analysis**.
+
+So far, we've used existing JavaScript constructs to handle narrowing. If you want more direct control over how types change throughout your code, you can use a user-defined type guard. Simply define a function whose return type is a **type predicate**. A predicate takes the form `parameterName is Type`. For example:
+```ts
+function isFish(pet: Fish | Bird): pet is Fish {
+  return (pet as Fish).swim !== undefined;
+}
+```
+If the function returns true, we can be sure that the pet is a Fish.
+
+Types can also be narrowed using assertion functions.
+
+When every type in a union contains a common property with literal types, TypeScript considers that to be a **discriminated union**, and can narrow out the members of the union based on the value of that common property.
+
+When narrowing, you can reduce the options of a union to a point where you have removed all possibilities and have nothing left. In those cases, TypeScript will use a `never` type to represent a state which shouldn’t exist.
+
 # Compiler
 
 After downloading the TypeScript compiler as a dev dependency, we can run `npx tsc hello.ts` to transpile it.
