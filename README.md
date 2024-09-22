@@ -4,6 +4,7 @@
 - [Functions](#functions)
 - [Object Types](#object-types)
 - [Type Manipulation](#type-manipulation)
+  - [Variance](#variance)
 - [Compiler](#compiler)
 
 
@@ -412,7 +413,69 @@ declare function create<T extends HTMLElement = HTMLDivElement, U extends HTMLEl
 ): Container<T, U>;
 ```
 
-TypeScript has a structural type system, so when comparing two types, e.g. to see if a `Producer<Cat>` can be used where a `Producer<Animal>` is expected, the usual algorithm would be structurally expand both of those definitions, and compare their structures. However, variance allows for an extremely useful optimization: if `Producer<T>` is covariant on `T`, then we can simply check `Cat` and `Animal` instead, as we know they’ll have the same relationship as `Producer<Cat>` and `Producer<Animal>`. TypeScript automatically infers the variance of every generic type. However, it may be useful to note that TypeScript has **variance annotations** (to enforce covariance, contravariance, or invariance) that should be used in extremely rare cases. For more info on the concept of variance, see [this great video](https://www.youtube.com/watch?v=zmvznP1lv3E). 
+The `keyof` operator produces a string or numeric literal union of an object type's keys. `type P = keyof { x: number; y: number };` is the same as `type P = "x" | "y"`.
+
+TypeScript already has a `typeof` operator, but TypeScript has one that you can use in a type context, like `let n: typeof s;`.
+
+There is a built-in type called `ReturnType`. If we try to use `ReturnType` on a function name, we will see a compile-time error:
+```ts
+function f() {
+  return { x: 10, y: 3 };
+}
+type P = ReturnType<f>;
+// ERROR: 'f' refers to a value, but is being used as a type here. Did you mean 'typeof f'?
+```
+
+Remember that *values and types aren't the same thing*. Instead, use `typeof` to get the type:
+```ts
+function f() {
+  return { x: 10, y: 3 };
+}
+type P = ReturnType<typeof f>;
+```
+
+Specifically, it’s only legal to use typeof on identifiers (i.e. variable names) or their properties. This helps avoid the confusing trap of writing code you think is executing, but isn’t:
+```ts
+// Meant to use = ReturnType<typeof msgbox>
+let shouldContinue: typeof msgbox("Are you sure you want to continue?");
+// ERROR: ',' expected.
+```
+
+We can use an indexed access type to look up a specific property on another type:
+```ts
+type Person = { age: number; name: string; alive: boolean };
+type Age = Person["age"];
+```
+You can do unions, use `keyof`, or other types in this index.
+
+You can index with "number" in conjunction with `typeof` to get the type of an array's elements:
+```ts
+const MyArray = [
+  { name: "Alice", age: 15 },
+];
+ 
+type Person = typeof MyArray[number];
+```
+
+## Variance
+
+**Covariance** and **contravariance** are type theory terms that describe what the relationship between two generic types is. The main concepts of covariance and contravariance can be displayed in the following examples. Assume `Cat` is a subtype of `Animal`. First:
+```ts
+interface Producer<T> {
+  make(): T;
+}
+```
+In this case, we would say the generic type `Producer<T>` is covariant, since you can use `Producer<Cat>` whereever a `Producer<Animal>` is required (i.e the relationship is the same as the relationship between a `Cat` and an `Animal`). Why can we do this? Well, you have to look at the structure of the interface. We have the function `make`, which simply states that it must be a function that outputs something of type `T`. A `Producer<Animal>` must have a function `make()` that outputs an `Animal`. We can see that a `Producer<Cat>` also satisfies this requirement! A `Producer<Cat>` has a function `make()` that outputs an `Animal` (more specifically, a `Cat`), so it can be used as a valid substitute.
+
+Now, take a look at a second example:
+```ts
+interface Consumer<T> {
+  consume: (arg: T) => void;
+}
+```
+Looking at the structure of the interface, we see that the sole function `consume` *takes in a parameter this time*. If I require a `Consumer<Animal>` (say, as a function argument), then, by extension, I require a function `consume` that should be able to take in any `Animal` I pass to it. This is why you can't use `Consumer<Cat>` as a substitute, as its `consume` function can only take in a `Cat`, rather than any `Animal`. Thus, this interface is not covariant. However, let's say we had a superclass of `Animal` called `LivingThing`. We would be able to subtitute `Consumer<LivingThing>` for `Consumer<Animal>`, because `Consumer<LivingThing>` has a function `consume` that can accept any `Animal` (and further, any `LivingThing`). 
+
+TypeScript has a structural type system, so when comparing two types, e.g. to see if a `Producer<Cat>` can be used where a `Producer<Animal>` is expected, the usual algorithm would be structurally expand both of those definitions, and compare their structures. However, variance allows for an extremely useful optimization: if `Producer<T>` is covariant on `T`, then we can simply check `Cat` and `Animal` instead, as we know they’ll have the same relationship as `Producer<Cat>` and `Producer<Animal>`. TypeScript *automatically infers the variance of every generic type*. However, it may be useful to note that TypeScript has [variance annotations](https://www.typescriptlang.org/docs/handbook/2/generics.html#variance-annotations) (to enforce covariance, contravariance, or invariance) that should be used in extremely rare cases. For more info on the concept of variance, see [this great video](https://www.youtube.com/watch?v=zmvznP1lv3E).
 
 # Compiler
 
