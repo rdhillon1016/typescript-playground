@@ -1,3 +1,12 @@
+- [Intro](#intro)
+- [Everyday Types](#everyday-types)
+- [Narrowing](#narrowing)
+- [Functions](#functions)
+- [Object Types](#object-types)
+- [Type Manipulation](#type-manipulation)
+- [Compiler](#compiler)
+
+
 # Intro
 
 TypeScript adds static type checking to JavaScript. TypeScript's tooling is especially great, as the core type-checker, which has information about what properties are in a type, can provide error messages and code completion as you type.
@@ -390,6 +399,20 @@ Array literals with const assertions will be inferred with readonly tuple types:
 ```ts
 let point = [3, 4] as const;
 ```
+
+# Type Manipulation
+
+You can have generic classes.
+
+You can have **generic parameter defaults**:
+```ts
+declare function create<T extends HTMLElement = HTMLDivElement, U extends HTMLElement[] = T[]>(
+  element?: T,
+  children?: U
+): Container<T, U>;
+```
+
+TypeScript has a structural type system, so when comparing two types, e.g. to see if a `Producer<Cat>` can be used where a `Producer<Animal>` is expected, the usual algorithm would be structurally expand both of those definitions, and compare their structures. However, variance allows for an extremely useful optimization: if `Producer<T>` is covariant on `T`, then we can simply check `Cat` and `Animal` instead, as we know they’ll have the same relationship as `Producer<Cat>` and `Producer<Animal>`. TypeScript automatically infers the variance of every generic type. However, it may be useful to note that TypeScript has **variance annotations** (to enforce covariance, contravariance, or invariance) that should be used in extremely rare cases. For more info on the concept of variance, see [this great video](https://www.youtube.com/watch?v=zmvznP1lv3E). 
 
 # Compiler
 
