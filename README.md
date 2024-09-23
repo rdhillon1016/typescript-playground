@@ -6,6 +6,7 @@
 - [Type Manipulation](#type-manipulation)
   - [Variance](#variance)
 - [Classes](#classes)
+- [Modules](#modules)
 - [Compiler](#compiler)
 
 
@@ -648,6 +649,15 @@ The TypeScript `InstanceType` helper type exists because a class name can repres
 `InstanceType` is used in cases like when you pass a class itself (i.e the constructor function) in as a parameter to a generic function, and the function needs to extract the instance type from that dynamically passed-in class ([source](https://stackoverflow.com/a/70368495)).
 
 `abstract` classes, methods, and fields exist in TypeScript. They can't be instantiated.
+
+# Modules
+
+TypeScript has extended the `import` syntax with two concepts for declaring an import fo a type:
+- `import type` which is an import statement that can only import types
+- Inline type imports:
+  ```ts
+  import { createCatName, type Cat, type Dog } from "./animal.js";
+  ```
 
 # Compiler
 
