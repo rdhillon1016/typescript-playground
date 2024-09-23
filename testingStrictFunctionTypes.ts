@@ -15,12 +15,3 @@ interface B {
 let b: B = {
     check: (name: "something") => name,
 }
-
-// But this fails?
-interface C {
-    check: function(name: string) string;
-}
-
-let c: C = {
-    check: (name: "something") => name,
-}

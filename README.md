@@ -597,7 +597,57 @@ TypeScript has some special inference rules for accessors:
 
 Classes can implement TypeScript interfaces using `implements`. It’s important to understand that an `implements` clause is only a check that the class can be treated as the interface type. It doesn’t change the type of the class or its methods at all.
 
+TypeScript has its own `public` (default), `private` and `protected` keywords (not the native JavaScript private prefix `#`). `private` and `protected` are only enforced during type checking, and thus JavaScript runtime constructs like `in` can still access a `private` or `protected` member.
 
+`private` also allows access using bracket notation during type checking. This makes `private`-declared fields potentially easier to access for things like unit tests, with the drawback that these fields are soft private and don’t strictly enforce privacy.
+
+Static members can also use the same visibility modifiers.
+
+It’s generally not safe/possible to overwrite properties from the `Function` prototype. Because classes are themselves functions that can be invoked with `new`, certain static names can’t be used. Function properties like `name`, `length`, and `call` aren’t valid to define as static members.
+
+Classes, much like interfaces, can be generic.
+
+We can statically type the implicit `this` parameter in JavaScript methods/functions.
+
+Addtionally, in classes, a special TypeScript type called `this` refers dynamically to the type of the current class.
+
+You can use `this is Type` in the return position for methods in classes and interfaces. When mixed with a type narrowing (e.g. `if` statements) the type of the target object would be narrowed to the specified `Type`:
+```ts
+class FileSystemObject {
+  isFile(): this is FileRep {
+    return this instanceof FileRep;
+  }
+}
+```
+This reads: "if the function `isFile()` returns `true`, then `this` is a `FileRep`". This is useful for narrowing:
+```ts
+if (fso.isFile()) {
+  fso.content; // TypeScript now knows fso is a FileRep
+}
+```
+
+TypeScript offers special syntax for turning a constructor parameter into a class property with the same name and value. These are called **parameter properties** and are created by prefixing a constructor argument with one of the visibility modifiers `public`, `private`, `protected`, or `readonly`.
+```ts
+class Params {
+  constructor(
+    public readonly x: number,
+    protected y: number,
+    private z: number
+  ) {
+    // No body necessary
+  }
+}
+```
+
+Class expressions exist and can be assigned to variables.
+
+The TypeScript `InstanceType` helper type exists because a class name can represent two things:
+- Class name as the constructor function at runtime: `typeof MyClass`.
+- Class name as the return type of the constructor function, at compile time. (including the `prototype` of the constructor function and optionally some instance fields): `MyClass` (a kind of interface which contains fields/methods).
+
+`InstanceType` is used in cases like when you pass a class itself (i.e the constructor function) in as a parameter to a generic function, and the function needs to extract the instance type from that dynamically passed-in class ([source](https://stackoverflow.com/a/70368495)).
+
+`abstract` classes, methods, and fields exist in TypeScript. They can't be instantiated.
 
 # Compiler
 
