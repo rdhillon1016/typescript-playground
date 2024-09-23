@@ -5,6 +5,7 @@
 - [Object Types](#object-types)
 - [Type Manipulation](#type-manipulation)
   - [Variance](#variance)
+- [Classes](#classes)
 - [Compiler](#compiler)
 
 
@@ -16,7 +17,7 @@ You can have JavaScript classes that implicitly implement an interface, just by 
 
 In addition to JavaScript's primitives, you can use `any` (allow anything), `unknown` (similar to the `any` type, but is safer because it’s not legal to do anything with an `unknown` value), `never` (this type can never happen), and `void` (a function which returns `undefined` or has no return value).
 
-You’ll see that there are two syntaxes for building types: Interfaces and Types. You should prefer interface. Use type when you need specific features.
+You’ll see that there are two syntaxes for building types: Interfaces and Types. You should prefer interface. Use type when you need specific features. You cannot provide default values for interfaces or type aliases as they are compile time only and default values need runtime support
 
 # Everyday Types
 
@@ -294,6 +295,74 @@ function f2(): void {
 }
 ```
 
+Let's say you have two functions. To determine whether they are type-compatible with each other (and thus assignable to each other), you must look at the parameters and return values. When comparing the types of function parameters, assignment succeeds if either the source parameter is assignable to the target parameter, or vice versa. This is called **function parameter bivariance** (see [Variance](#variance) -- we can think of a function as being a type that is generic on its parameters and return value). This is unsound because a caller might end up being given a function that takes a more specialized type, but invokes the function with a less specialized type. In practice, this sort of error is rare, and allowing this enables many common JavaScript patterns. A brief example:
+```ts
+enum EventType {
+  Mouse,
+  Keyboard,
+}
+interface Event {
+  timestamp: number;
+}
+interface MyMouseEvent extends Event {
+  x: number;
+  y: number;
+}
+interface MyKeyEvent extends Event {
+  keyCode: number;
+}
+function listenEvent(eventType: EventType, handler: (n: Event) => void) {
+  /* ... */
+}
+// Unsound, but useful and common
+listenEvent(EventType.Mouse, (e: MyMouseEvent) => console.log(e.x + "," + e.y));
+// Undesirable alternatives in presence of soundness
+listenEvent(EventType.Mouse, (e: Event) =>
+  console.log((e as MyMouseEvent).x + "," + (e as MyMouseEvent).y)
+);
+listenEvent(EventType.Mouse, ((e: MyMouseEvent) =>
+  console.log(e.x + "," + e.y)) as (e: Event) => void);
+// Still disallowed (clear error). Type safety enforced for wholly incompatible types
+listenEvent(EventType.Mouse, (e: number) => console.log(e));
+```
+
+You can have TypeScript raise errors when this happens via the compiler flag `strictFunctionTypes`. This flag will enforce function parameter contravariance. Function return values, on the other hand, are covariant. 
+
+However, the `strictFunctionTypes` flag does not apply to functions declared in **method syntax** (for [historical reasons](https://www.typescriptlang.org/tsconfig/#strictFunctionTypes)). A method (in the stricter JavaScript sense -- not the general object oriented programming sense of a function defined on an object) is a function that was defined through the concise method syntax in an object literal or as a class method in a class declaration / expression. Additionally, "methods" come with [some specificities](https://stackoverflow.com/a/54961371). Here are some examples of the syntax:
+```ts
+// In object literals:
+const obj = {
+    method() {}
+};
+// In class declarations:
+class MyClass {
+    method() {}
+}
+```
+
+For example, the following code, even though the object literal's `check` function parameters are stricter than the interface's `check` parameters and thus it shouldn't be assignable to a variable of type `A`, will pass the compile step even with `strictFunctionTypes` enabled since the function in `A` is defined using method syntax:
+```ts
+interface A {
+    check(name: string): string;
+}
+
+let a: A = {
+    check: (name: "something") => name,
+}
+```
+But this code will fail to compile:
+```ts
+interface B {
+    check: (name: string) => string;
+}
+
+let b: B = {
+    check: (name: "something") => name,
+}
+```
+
+For more on type compatibility, [see this documentation](https://www.typescriptlang.org/docs/handbook/type-compatibility.html).
+
 # Object Types
 
 Properties can be marked `readonly` (can't be re-assigned).
@@ -457,6 +526,45 @@ const MyArray = [
 type Person = typeof MyArray[number];
 ```
 
+You can have conditional types:
+```ts
+type NameOrId<T extends number | string> = T extends number
+  ? IdLabel
+  : NameLabel;
+```
+
+Here, we use the `infer` keyword to declaratively introduce a new generic type variable named `Item` instead of specifying how to retrieve the element type of `Type` within the true branch. This frees us from having to think about how to dig through and probing apart the structure of the types we’re interested in:
+```ts
+type Flatten<Type> = Type extends Array<infer Item> ? Item : Type;
+// vs
+type Flatten<T> = T extends any[] ? T[number] : T;
+type Str = Flatten<string[]>; // type Str = string
+```
+
+When conditional types act on a generic type, they become **distributive** when given a union type. That is, the coonditional type is applied individually to each member and creates a union of the results.
+
+A **mapped type** is a generic type which uses a union of PropertyKeys (frequently created via a keyof) to iterate through keys to create a type:
+```ts
+type OptionsFlags<Type> = {
+  [Property in keyof Type]: boolean;
+};
+```
+You can add (`+`) or remove (`-`) `readonly` and `?` (optionality) modifiers for mapped types.
+```ts
+// Removes 'readonly' attributes from a type's properties
+type CreateMutable<Type> = {
+  -readonly [Property in keyof Type]: Type[Property];
+};
+```
+
+You can have template literal types:
+```ts
+type World = "world";
+type Greeting = `hello ${World}`;
+```
+
+To help with string manipulation, TypeScript includes a set of types which can be used in string manipulation, like `Uppercase<StringType>`. These types come built-in to the compiler for performance and can’t be found in the `.d.ts` files included with TypeScript.
+
 ## Variance
 
 **Covariance** and **contravariance** are type theory terms that describe what the relationship between two generic types is. The main concepts of covariance and contravariance can be displayed in the following examples. Assume `Cat` is a subtype of `Animal`. First:
@@ -476,6 +584,20 @@ interface Consumer<T> {
 Looking at the structure of the interface, we see that the sole function `consume` *takes in a parameter this time*. If I require a `Consumer<Animal>` (say, as a function argument), then, by extension, I require a function `consume` that should be able to take in any `Animal` I pass to it. This is why you can't use `Consumer<Cat>` as a substitute, as its `consume` function can only take in a `Cat`, rather than any `Animal`. Thus, this interface is not covariant. However, let's say we had a superclass of `Animal` called `LivingThing`. We would be able to subtitute `Consumer<LivingThing>` for `Consumer<Animal>`, because `Consumer<LivingThing>` has a function `consume` that can accept any `Animal` (and further, any `LivingThing`). 
 
 TypeScript has a structural type system, so when comparing two types, e.g. to see if a `Producer<Cat>` can be used where a `Producer<Animal>` is expected, the usual algorithm would be structurally expand both of those definitions, and compare their structures. However, variance allows for an extremely useful optimization: if `Producer<T>` is covariant on `T`, then we can simply check `Cat` and `Animal` instead, as we know they’ll have the same relationship as `Producer<Cat>` and `Producer<Animal>`. TypeScript *automatically infers the variance of every generic type*. However, it may be useful to note that TypeScript has [variance annotations](https://www.typescriptlang.org/docs/handbook/2/generics.html#variance-annotations) (to enforce covariance, contravariance, or invariance) that should be used in extremely rare cases. For more info on the concept of variance, see [this great video](https://www.youtube.com/watch?v=zmvznP1lv3E).
+
+# Classes
+
+Properties in classes can have types. Prefixing with a `readonly` modifier prevents assignments to fields outside of the constructor.
+
+Just as in JavaScript, if you have a base class, you’ll need to call `super()`. TypeScript will catch this common error.
+
+TypeScript has some special inference rules for accessors:
+- If `get` exists but no `set`, the property is automatically `readonly`
+- If the type of the setter parameter is not specified, it is inferred from the return type of the getter
+
+Classes can implement TypeScript interfaces using `implements`. It’s important to understand that an `implements` clause is only a check that the class can be treated as the interface type. It doesn’t change the type of the class or its methods at all.
+
+
 
 # Compiler
 
