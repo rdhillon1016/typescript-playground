@@ -8,6 +8,7 @@
 - [Classes](#classes)
 - [Modules](#modules)
 - [Compiler](#compiler)
+- [Theory](#theory)
 
 
 # Intro
@@ -670,3 +671,16 @@ By default, the compiler targets ES5 (old) as output.
 There are two big strictness flags that can be turned on in `tsoncfig.json`: 
 - `noImplicitAny`, which prevents TypeScript from falling back to the most lenient type `any` for type inference.
 - `strictNullChecks`, which makes sure you handle `null` and `undefined`, as they are assignable to any other type by default. Handling such values is a form of narrowing.
+
+# Theory
+
+One question you may have is: Why explicitly declare types at all, if TypeScript has static inference?
+- TypeScript's inference has limitations, and may choose a more general type than expected, like `any`. For example, function argument types are often not inferred from their usage inside the function, like:
+  ```ts
+  function hello(r) {
+    return r.what;
+  }
+  ```
+  Here, `r` is inferred as `any`, when it could be more specifically an object with a `what` property.
+- Explicit types provide a clear contract for users and other developers in a shared repository. For example, if you explicitly set a function return type, you can be sure that changes to the body that accidentally change the return type will be immediately caught, localized to the function. Contrast that with an inferred return type -- you can change the body and the return type will change automatically through inference, and may propogate to cause issues elsewhere in the code or even change the contract of an API you're exposing.
+- It turns out full, complete type inference is [really hard](https://qr.ae/p24ig2), and requires the language to be designed in a particular way. This is a good [talk](https://www.youtube.com/watch?v=BMT6MZ5zuvw&t=1s). For more info if interested, learn about Hindley-Milner type inference and the lambda calculus.
